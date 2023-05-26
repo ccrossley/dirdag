@@ -40,7 +40,7 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 		if err != nil {
 			return err
 		}
-		if resolvedInfo.IsDir() {
+		if resolvedInfo.IsDir() && depth < maxDepth {
 			node = fs.FileInfoToDirEntry(resolvedInfo)
 			path = resolvedPath
 		}

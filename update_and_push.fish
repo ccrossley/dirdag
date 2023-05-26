@@ -8,13 +8,22 @@ function update_and_push
         exit 1
     end
 
+    # Get the directory of this script
+    set script_dir (dirname (status --current-filename))
+
+    # Change to the script directory
+    cd $script_dir
+
     git add .
     git commit -m "$commit_message"
     git push
 
-    # Assuming dirdiag is in the current directory
+    # Assuming dirdiag is in the script directory
     go install ./...
     echo "Update and push completed."
+
+    # Change back to the original directory
+    cd -
 end
 
 update_and_push $argv
