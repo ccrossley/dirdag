@@ -40,39 +40,44 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 		if !filepath.IsAbs(resolvedPath) {
 			resolvedPath = filepath.Join(path, resolvedPath)
 		}
-	}
-
-	// Print only directories and .fish files
-	if node.IsDir() || filepath.Ext(node.Name()) == ".fish" {
-		fmt.Println(prefix + node.Name() + symlink)
-	}
-
-	// If it's a directory and we haven't reached max depth, recurse further
-	if node.IsDir() && depth < maxDepth {
-		newPath := filepath.Join(path, node.Name())
-		dirEntries, err := os.ReadDir(newPath)
+		resolvedInfo, err := os.Stat(resolvedPath)
 		if err != nil {
 			return err
 		}
+		// If the resolved symlink is a directory, print it and continue further
+		if resolvedInfo.IsDir() {
+			fmt.Println(prefix + node.Name() + symlink)
+			// If we haven't reached max depth, recurse further
+			if depth < maxDepth {
+				path = resolvedPath
+				dirEntries, err := os.ReadDir(path)
+				if err != nil {
+					return err
+				}
 
-		for i, entry := range dirEntries {
-			isLast := i == len(dirEntries)-1
+				for i, entry := range dirEntries {
+					isLast := i == len(dirEntries)-1
 
-			newPrefix := indent
-			if isLast {
-				newPrefix = lastIndent
+					newPrefix := indent
+					if isLast {
+						newPrefix = lastIndent
+					}
+
+					entryPrefix := prefix + newPrefix
+					if isLast {
+						entryPrefix = prefix + lastPrefix
+					}
+
+					newDepth := depth + 1
+					err = printDir(path, entry, entryPrefix, newDepth, maxDepth)
+					if err != nil {
+						return err
+					}
+				}
 			}
-
-			entryPrefix := prefix + newPrefix
-			if isLast {
-				entryPrefix = prefix + lastPrefix
-			}
-
-			newDepth := depth + 1
-			err = printDir(newPath, entry, entryPrefix, newDepth, maxDepth)
-			if err != nil {
-				return err
-			}
+		} else {
+			// If the resolved symlink is a file, print it
+			fmt.Println(prefix + node.Name() + symlink)
 		}
 	}
 	return nil
