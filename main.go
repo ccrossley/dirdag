@@ -57,16 +57,15 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 
 		for i, entry := range dirEntries {
 			isLast := i == len(dirEntries)-1
+
 			newPrefix := indent
 			if isLast {
 				newPrefix = lastIndent
 			}
+
 			entryPrefix := prefix + newPrefix
-			newPrefix = prefix + newPrefix
 			if isLast {
 				entryPrefix = prefix + lastPrefix
-			} else {
-				entryPrefix = prefix + prefix
 			}
 
 			err = printDir(newPath, entry, entryPrefix, depth+1, maxDepth)
