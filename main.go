@@ -32,6 +32,8 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 		if err != nil {
 			return err
 		}
+		// Trim the trailing slash if it exists
+		resolvedPath = strings.TrimSuffix(resolvedPath, "/")
 		// Convert resolved path to absolute path
 		if !filepath.IsAbs(resolvedPath) {
 			resolvedPath = filepath.Join(path, resolvedPath)
