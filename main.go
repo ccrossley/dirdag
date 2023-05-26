@@ -26,10 +26,11 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 	// Check if entry is a symlink
 	symlink := ""
 	isSymlink := node.Type()&fs.ModeSymlink != 0
+	var resolvedPath string
 	if isSymlink {
 		symlink = " (symlink)"
 		var err error
-		resolvedPath, err := os.Readlink(filepath.Join(path, node.Name()))
+		resolvedPath, err = os.Readlink(filepath.Join(path, node.Name()))
 		if err != nil {
 			return err
 		}
@@ -39,40 +40,6 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 		if !filepath.IsAbs(resolvedPath) {
 			resolvedPath = filepath.Join(path, resolvedPath)
 		}
-
-		resolvedInfo, err := os.Stat(resolvedPath)
-		if err != nil {
-			return err
-		}
-
-		// If resolved path is a directory and we haven't reached max depth, recurse further
-		if resolvedInfo.IsDir() && depth < maxDepth {
-			dirEntries, err := os.ReadDir(resolvedPath)
-			if err != nil {
-				return err
-			}
-
-			for i, entry := range dirEntries {
-				isLast := i == len(dirEntries)-1
-
-				newPrefix := indent
-				if isLast {
-					newPrefix = lastIndent
-				}
-
-				entryPrefix := prefix + newPrefix
-				if isLast {
-					entryPrefix = prefix + lastPrefix
-				}
-
-				newDepth := depth + 1
-				err = printDir(resolvedPath, entry, entryPrefix, newDepth, maxDepth)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil // Skip printing and recursing for symlinked files
 	}
 
 	// Print only directories and .fish files
