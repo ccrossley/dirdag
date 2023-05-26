@@ -83,7 +83,6 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 }
 
 func main() {
-	fmt.Println("Dirdiag...")
 	args := os.Args[1:]
 	if len(args) < 1 {
 		fmt.Println("Provide directory to diagram")
@@ -114,7 +113,7 @@ func main() {
 		err = printDir(root, entry, prefix, 1, maxDepth)
 		if err != nil {
 			fmt.Println("Error printing directory:", err)
-			os.Exit(1)
+			//os.Exit(1)
 		}
 	}
 	fmt.Println("Diagram generation completed.")
