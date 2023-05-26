@@ -28,22 +28,51 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 	isSymlink := node.Type()&fs.ModeSymlink != 0
 	if isSymlink {
 		symlink = " (symlink)"
+		var err error
 		resolvedPath, err := os.Readlink(filepath.Join(path, node.Name()))
 		if err != nil {
 			return err
 		}
+		// Trim the trailing slash if it exists
+		resolvedPath = strings.TrimSuffix(resolvedPath, "/")
 		// Convert resolved path to absolute path
 		if !filepath.IsAbs(resolvedPath) {
 			resolvedPath = filepath.Join(path, resolvedPath)
 		}
+
 		resolvedInfo, err := os.Stat(resolvedPath)
 		if err != nil {
 			return err
 		}
+
+		// If resolved path is a directory and we haven't reached max depth, recurse further
 		if resolvedInfo.IsDir() && depth < maxDepth {
-			node = fs.FileInfoToDirEntry(resolvedInfo)
-			path = filepath.Dir(resolvedPath)
+			dirEntries, err := os.ReadDir(resolvedPath)
+			if err != nil {
+				return err
+			}
+
+			for i, entry := range dirEntries {
+				isLast := i == len(dirEntries)-1
+
+				newPrefix := indent
+				if isLast {
+					newPrefix = lastIndent
+				}
+
+				entryPrefix := prefix + newPrefix
+				if isLast {
+					entryPrefix = prefix + lastPrefix
+				}
+
+				newDepth := depth + 1
+				err = printDir(resolvedPath, entry, entryPrefix, newDepth, maxDepth)
+				if err != nil {
+					return err
+				}
+			}
 		}
+		return nil // Skip printing and recursing for symlinked files
 	}
 
 	// Print only directories and .fish files
@@ -61,19 +90,19 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 
 		for i, entry := range dirEntries {
 			isLast := i == len(dirEntries)-1
+
 			newPrefix := indent
 			if isLast {
 				newPrefix = lastIndent
 			}
+
 			entryPrefix := prefix + newPrefix
-			newPrefix = prefix + newPrefix
 			if isLast {
 				entryPrefix = prefix + lastPrefix
-			} else {
-				entryPrefix = prefix + prefix
 			}
 
-			err = printDir(newPath, entry, entryPrefix, depth+1, maxDepth)
+			newDepth := depth + 1
+			err = printDir(newPath, entry, entryPrefix, newDepth, maxDepth)
 			if err != nil {
 				return err
 			}
