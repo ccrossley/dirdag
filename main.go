@@ -68,7 +68,12 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 				entryPrefix = prefix + lastPrefix
 			}
 
+			fmt.Println("Before recursion: depth =", depth, "maxDepth =", maxDepth)
 			err = printDir(newPath, entry, entryPrefix, depth+1, maxDepth)
+			if err != nil {
+				return err
+			}
+			fmt.Println("After recursion: depth =", depth, "maxDepth =", maxDepth)
 			if err != nil {
 				return err
 			}
