@@ -5,8 +5,47 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 )
+
+var (
+	prefix     = "├── "
+	indent     = "│   "
+	lastPrefix = "└── "
+	lastIndent = "    "
+)
+
+func printDir(path string, node fs.DirEntry, prefix string) error {
+	fmt.Println(prefix + node.Name())
+	if node.IsDir() {
+		newPath := filepath.Join(path, node.Name())
+		dirEntries, err := os.ReadDir(newPath)
+		if err != nil {
+			return err
+		}
+
+		for i, entry := range dirEntries {
+			isLast := i == len(dirEntries)-1
+			if entry.IsDir() || filepath.Ext(entry.Name()) == ".fish" {
+				newPrefix := indent
+				if isLast {
+					newPrefix = lastIndent
+				}
+				entryPrefix := prefix + newPrefix
+				newPrefix = prefix + newPrefix
+				if isLast {
+					entryPrefix = prefix + lastPrefix
+				} else {
+					entryPrefix = prefix + prefix
+				}
+				err := printDir(newPath, entry, entryPrefix)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
 
 func main() {
 	args := os.Args[1:]
@@ -15,40 +54,25 @@ func main() {
 		os.Exit(1)
 	}
 	root := args[0]
-	if !strings.HasSuffix(root, string(os.PathSeparator)) {
-		root += string(os.PathSeparator)
-	}
-	f, err := os.Create("output.mmd")
+	dirEntries, err := os.ReadDir(root)
 	if err != nil {
-		fmt.Println("Error creating output file:", err)
+		fmt.Println("Error reading directory:", err)
 		os.Exit(1)
 	}
-	defer f.Close()
-	f.WriteString("graph TB\n")
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() || filepath.Ext(path) == ".fish" {
-			node := strings.ReplaceAll(path, root, "")
-			node = strings.ReplaceAll(node, string(os.PathSeparator), "_")
-			label := strings.ReplaceAll(path, root, "")
-			if d.IsDir() {
-				label += "/"
+	fmt.Println(root)
+	for i, entry := range dirEntries {
+		isLast := i == len(dirEntries)-1
+		if entry.IsDir() || filepath.Ext(entry.Name()) == ".fish" {
+			prefix := prefix
+			if isLast {
+				prefix = lastPrefix
 			}
-			f.WriteString(node + "[\"" + label + "\"]\n")
-			if d.IsDir() || (d.Type()&fs.ModeSymlink != 0) {
-				link := filepath.Dir(path)
-				link = strings.ReplaceAll(link, root, "")
-				link = strings.ReplaceAll(link, string(os.PathSeparator), "_")
-				f.WriteString(link + "-->" + node + "\n")
+			err := printDir(root, entry, prefix)
+			if err != nil {
+				fmt.Println("Error printing directory:", err)
+				os.Exit(1)
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		fmt.Println("Error walking the directory:", err)
-		os.Exit(1)
 	}
 	fmt.Println("Diagram generation completed.")
 }
