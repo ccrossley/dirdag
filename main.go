@@ -50,11 +50,6 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 	// If it's a directory and we haven't reached max depth, recurse further
 	if node.IsDir() && depth < maxDepth {
 		newPath := filepath.Join(path, node.Name())
-		// If this is a symlink, use the resolved path
-		if isSymlink {
-			newPath = resolvedPath
-		}
-
 		dirEntries, err := os.ReadDir(newPath)
 		if err != nil {
 			return err
