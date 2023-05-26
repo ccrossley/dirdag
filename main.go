@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,51 +16,57 @@ var (
 	defaultDepth = 3
 )
 
-func printDir(path string, node os.DirEntry, prefix string, depth, maxDepth int) error {
+func printDir(path string, prefix string, depth, maxDepth int) error {
+	// Get information about the path
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+
+	// Get the base name of the path
+	name := filepath.Base(path)
+
 	// Skip hidden files or directories
-	if strings.HasPrefix(node.Name(), ".") {
+	if strings.HasPrefix(name, ".") {
 		return nil
 	}
 
 	// Check if entry is a symlink
 	symlink := ""
-	if node.Type()&fs.ModeSymlink != 0 {
+	if (info.Mode() & os.ModeSymlink) != 0 {
 		symlink = " (symlink)"
-	}
-
-	info, err := node.Info()
-	if err != nil {
-		return err
+		// If it's a symlink, get the information about the path it points to
+		info, err = os.Stat(path)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Print only directories and .fish files
-	if info.IsDir() || filepath.Ext(node.Name()) == ".fish" {
-		fmt.Println(prefix + node.Name() + symlink)
+	if info.IsDir() || filepath.Ext(name) == ".fish" {
+		fmt.Println(prefix + name + symlink)
 	}
 
 	// If it's a directory and we haven't reached max depth, recurse further
 	if info.IsDir() && depth < maxDepth {
-		newPath := filepath.Join(path, node.Name())
-		dirEntries, err := os.ReadDir(newPath)
+		files, err := os.ReadDir(path)
 		if err != nil {
 			return err
 		}
-
-		for i, entry := range dirEntries {
-			isLast := i == len(dirEntries)-1
+		for i, file := range files {
+			newPath := filepath.Join(path, file.Name())
 			newPrefix := indent
-			if isLast {
+			if i == len(files)-1 {
 				newPrefix = lastIndent
 			}
 			entryPrefix := prefix + newPrefix
 			newPrefix = prefix + newPrefix
-			if isLast {
+			if i == len(files)-1 {
 				entryPrefix = prefix + lastPrefix
 			} else {
 				entryPrefix = prefix + prefix
 			}
-
-			err = printDir(newPath, entry, entryPrefix, depth+1, maxDepth)
+			err = printDir(newPath, entryPrefix, depth+1, maxDepth)
 			if err != nil {
 				return err
 			}
@@ -86,23 +91,11 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	dirEntries, err := os.ReadDir(root)
-	if err != nil {
-		fmt.Println("Error reading directory:", err)
-		os.Exit(1)
-	}
 	fmt.Println(root)
-	for i, entry := range dirEntries {
-		isLast := i == len(dirEntries)-1
-		prefix := prefix
-		if isLast {
-			prefix = lastPrefix
-		}
-		err = printDir(root, entry, prefix, 1, maxDepth)
-		if err != nil {
-			fmt.Println("Error printing directory:", err)
-			os.Exit(1)
-		}
+	err := printDir(root, prefix, 1, maxDepth)
+	if err != nil {
+		fmt.Println("Error printing directory:", err)
+		os.Exit(1)
 	}
 	fmt.Println("Diagram generation completed.")
 }
