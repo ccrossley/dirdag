@@ -26,16 +26,12 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 	// Check if entry is a symlink
 	symlink := ""
 	isSymlink := node.Type()&fs.ModeSymlink != 0
-	var resolvedPath string
 	if isSymlink {
 		symlink = " (symlink)"
-		var err error
-		resolvedPath, err = os.Readlink(filepath.Join(path, node.Name()))
+		resolvedPath, err := os.Readlink(filepath.Join(path, node.Name()))
 		if err != nil {
 			return err
 		}
-		// Trim the trailing slash if it exists
-		resolvedPath = strings.TrimSuffix(resolvedPath, "/")
 		// Convert resolved path to absolute path
 		if !filepath.IsAbs(resolvedPath) {
 			resolvedPath = filepath.Join(path, resolvedPath)
@@ -44,40 +40,43 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 		if err != nil {
 			return err
 		}
-		// If the resolved symlink is a directory, print it and continue further
-		if resolvedInfo.IsDir() {
-			fmt.Println(prefix + node.Name() + symlink)
-			// If we haven't reached max depth, recurse further
-			if depth < maxDepth {
-				path = resolvedPath
-				dirEntries, err := os.ReadDir(path)
-				if err != nil {
-					return err
-				}
+		if resolvedInfo.IsDir() && depth < maxDepth {
+			node = fs.FileInfoToDirEntry(resolvedInfo)
+			path = filepath.Dir(resolvedPath)
+		}
+	}
 
-				for i, entry := range dirEntries {
-					isLast := i == len(dirEntries)-1
+	// Print only directories and .fish files
+	if node.IsDir() || filepath.Ext(node.Name()) == ".fish" {
+		fmt.Println(prefix + node.Name() + symlink)
+	}
 
-					newPrefix := indent
-					if isLast {
-						newPrefix = lastIndent
-					}
+	// If it's a directory and we haven't reached max depth, recurse further
+	if node.IsDir() && depth < maxDepth {
+		newPath := filepath.Join(path, node.Name())
+		dirEntries, err := os.ReadDir(newPath)
+		if err != nil {
+			return err
+		}
 
-					entryPrefix := prefix + newPrefix
-					if isLast {
-						entryPrefix = prefix + lastPrefix
-					}
-
-					newDepth := depth + 1
-					err = printDir(path, entry, entryPrefix, newDepth, maxDepth)
-					if err != nil {
-						return err
-					}
-				}
+		for i, entry := range dirEntries {
+			isLast := i == len(dirEntries)-1
+			newPrefix := indent
+			if isLast {
+				newPrefix = lastIndent
 			}
-		} else {
-			// If the resolved symlink is a file, print it
-			fmt.Println(prefix + node.Name() + symlink)
+			entryPrefix := prefix + newPrefix
+			newPrefix = prefix + newPrefix
+			if isLast {
+				entryPrefix = prefix + lastPrefix
+			} else {
+				entryPrefix = prefix + prefix
+			}
+
+			err = printDir(newPath, entry, entryPrefix, depth+1, maxDepth)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
