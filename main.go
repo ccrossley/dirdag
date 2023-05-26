@@ -42,7 +42,11 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 		}
 		if resolvedInfo.IsDir() && depth < maxDepth {
 			node = fs.FileInfoToDirEntry(resolvedInfo)
-			path = filepath.Dir(resolvedPath)
+			if resolvedInfo.Mode()&os.ModeSymlink != 0 {
+				path = filepath.Dir(resolvedPath)
+			} else {
+				path = resolvedPath
+			}
 		}
 	}
 
