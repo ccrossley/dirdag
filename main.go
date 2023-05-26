@@ -113,7 +113,7 @@ func main() {
 		err = printDir(root, entry, prefix, 1, maxDepth)
 		if err != nil {
 			fmt.Println("Error printing directory:", err)
-			//os.Exit(1)
+			os.Exit(1)
 		}
 	}
 	fmt.Println("Diagram generation completed.")
