@@ -26,9 +26,11 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 	// Check if entry is a symlink
 	symlink := ""
 	isSymlink := node.Type()&fs.ModeSymlink != 0
+	var resolvedPath string
 	if isSymlink {
 		symlink = " (symlink)"
-		resolvedPath, err := os.Readlink(filepath.Join(path, node.Name()))
+		var err error
+		resolvedPath, err = os.Readlink(filepath.Join(path, node.Name()))
 		if err != nil {
 			return err
 		}
@@ -37,14 +39,6 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 		// Convert resolved path to absolute path
 		if !filepath.IsAbs(resolvedPath) {
 			resolvedPath = filepath.Join(path, resolvedPath)
-		}
-		resolvedInfo, err := os.Stat(resolvedPath)
-		if err != nil {
-			return err
-		}
-		if resolvedInfo.IsDir() && depth < maxDepth {
-			node = fs.FileInfoToDirEntry(resolvedInfo)
-			path = filepath.Dir(resolvedPath)
 		}
 	}
 
@@ -56,6 +50,11 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 	// If it's a directory and we haven't reached max depth, recurse further
 	if node.IsDir() && depth < maxDepth {
 		newPath := filepath.Join(path, node.Name())
+		// If this is a symlink, use the resolved path
+		if isSymlink {
+			newPath = resolvedPath
+		}
+
 		dirEntries, err := os.ReadDir(newPath)
 		if err != nil {
 			return err
