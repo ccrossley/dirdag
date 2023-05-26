@@ -32,6 +32,8 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 		if err != nil {
 			return err
 		}
+		// Convert resolved path to absolute path
+		resolvedPath = filepath.Join(path, resolvedPath)
 		resolvedInfo, err := os.Stat(resolvedPath)
 		if err != nil {
 			return err
