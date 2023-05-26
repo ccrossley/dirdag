@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,7 +11,8 @@ import (
 func main() {
 	args := os.Args[1:]
 	if len(args) != 1 {
-		panic("Provide directory to diagram")
+		fmt.Println("Provide directory to diagram")
+		os.Exit(1)
 	}
 	root := args[0]
 	if !strings.HasSuffix(root, string(os.PathSeparator)) {
@@ -18,11 +20,12 @@ func main() {
 	}
 	f, err := os.Create("output.mmd")
 	if err != nil {
-		panic(err)
+		fmt.Println("Error creating output file:", err)
+		os.Exit(1)
 	}
 	defer f.Close()
 	f.WriteString("graph TB\n")
-	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -43,4 +46,9 @@ func main() {
 		}
 		return nil
 	})
+	if err != nil {
+		fmt.Println("Error walking the directory:", err)
+		os.Exit(1)
+	}
+	fmt.Println("Diagram generation completed.")
 }
