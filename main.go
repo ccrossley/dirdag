@@ -110,8 +110,6 @@ func main() {
 			fmt.Println("Invalid maximum depth:", err)
 			os.Exit(1)
 		}
-
-		fmt.Println("Max Depth:", maxDepth)
 	}
 
 	rootNode, err := buildTree(root, maxDepth)
