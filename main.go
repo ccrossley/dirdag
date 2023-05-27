@@ -93,29 +93,30 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+	// Convert the root directory to an absolute path
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		fmt.Println("Invalid root directory:", err)
+		os.Exit(1)
+	}
+
+	// Extract the base name of the root directory
+	rootName := filepath.Base(absRoot)
+
 	dirEntries, err := os.ReadDir(root)
 	if err != nil {
 		fmt.Println("Error reading directory:", err)
 		os.Exit(1)
 	}
-	fmt.Println(root)
+	fmt.Println(rootName)
 	for i, entry := range dirEntries {
 		isLast := i == len(dirEntries)-1
 		prefix := prefix
 		if isLast {
 			prefix = lastPrefix
 		}
-
-		// Use os.Stat to get information about the entry (os.Stat follows symlinks)
-		info, err := os.Stat(filepath.Join(root, entry.Name()))
-		if err != nil {
-			fmt.Println("Error accessing entry:", err)
-			os.Exit(1)
-		}
-
-		// Create a fs.DirEntry from the FileInfo obtained from os.Stat
-		entry = fs.FileInfoToDirEntry(info)
-		err = printDir(root, entry, prefix, 1, maxDepth)
+		err := printDir(root, entry, prefix, 1, maxDepth)
 		if err != nil {
 			fmt.Println("Error printing directory:", err)
 			os.Exit(1)
