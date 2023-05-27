@@ -79,7 +79,6 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 }
 
 func main() {
-	fmt.Println("The fug?")
 	args := os.Args[1:]
 	if len(args) < 1 {
 		fmt.Println("Provide directory to diagram")
