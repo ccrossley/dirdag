@@ -8,6 +8,12 @@ import (
 	"strings"
 )
 
+type Node struct {
+	Name     string
+	Children []*Node
+	IsLink   bool
+}
+
 var (
 	prefix       = "├── "
 	indent       = "│   "
@@ -16,46 +22,74 @@ var (
 	defaultDepth = 3
 )
 
-func printDir(root string, maxDepth int) error {
-	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+func buildTree(root string, maxDepth int) (*Node, error) {
+	rootNode := &Node{Name: root}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		// Ignore the root directory
-		if path == root {
-			return nil
-		}
+
 		// Get the relative path
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
 			return err
 		}
-		// Skip hidden files and directories
+
+		// Skip hidden files or directories
 		parts := strings.Split(rel, string(filepath.Separator))
 		for _, part := range parts {
 			if strings.HasPrefix(part, ".") {
-				return filepath.SkipDir
+				return nil
 			}
 		}
+
 		// Check the depth
 		depth := len(parts)
 		if depth > maxDepth {
-			return filepath.SkipDir
+			return nil
 		}
+
 		// Check the file type
 		if info.IsDir() || filepath.Ext(info.Name()) == ".fish" {
-			// Create the prefix
-			prefix := strings.Repeat(indent, depth-1)
-			if depth > 1 {
-				prefix += prefix
+			// Traverse the tree to the correct location
+			current := rootNode
+			for _, part := range parts {
+				found := false
+				for _, child := range current.Children {
+					if child.Name == part {
+						current = child
+						found = true
+						break
+					}
+				}
+				if !found {
+					newNode := &Node{Name: part}
+					current.Children = append(current.Children, newNode)
+					current = newNode
+				}
 			}
-			if info.Mode()&os.ModeSymlink != 0 {
-				prefix += "(symlink) "
-			}
-			fmt.Println(prefix + info.Name())
+			current.IsLink = info.Mode()&os.ModeSymlink != 0
 		}
+
 		return nil
 	})
+
+	return rootNode, err
+}
+
+func printTree(node *Node, prefix string) {
+	fmt.Println(prefix + node.Name)
+	newPrefix := prefix + indent
+	if node.IsLink {
+		newPrefix += "(symlink) "
+	}
+	for i, child := range node.Children {
+		if i == len(node.Children)-1 {
+			printTree(child, newPrefix+lastPrefix)
+		} else {
+			printTree(child, newPrefix+prefix)
+		}
+	}
 }
 
 func main() {
@@ -74,11 +108,13 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	fmt.Println(root)
-	err := printDir(root, maxDepth)
+
+	rootNode, err := buildTree(root, maxDepth)
 	if err != nil {
-		fmt.Println("Error printing directory:", err)
+		fmt.Println("Error building directory tree:", err)
 		os.Exit(1)
 	}
+
+	printTree(rootNode, "")
 	fmt.Println("Diagram generation completed.")
 }
