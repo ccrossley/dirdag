@@ -62,7 +62,8 @@ func buildTree(root string, maxDepth int) (*Node, error) {
 						break
 					}
 				}
-				if !found {
+				// Add a new node only if depth is within the limit
+				if !found && depth <= maxDepth {
 					newNode := &Node{Name: part}
 					current.Children = append(current.Children, newNode)
 					current = newNode
