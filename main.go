@@ -23,15 +23,29 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 		return nil
 	}
 
-	// Check if entry is a symlink
-	symlink := ""
-	if node.Type()&fs.ModeSymlink != 0 {
-		symlink = " (symlink)"
+	// Check if the node is a symlink
+	info, err := node.Info()
+	if err != nil {
+		return err
 	}
 
 	// Print only directories and .fish files
 	if node.IsDir() || filepath.Ext(node.Name()) == ".fish" {
-		fmt.Println(prefix + node.Name() + symlink)
+		if info.Mode()&fs.ModeSymlink != 0 {
+			target, err := os.Readlink(filepath.Join(path, node.Name()))
+			if err != nil {
+				return err
+			}
+
+			// Make the target path relative to $GOPATH
+			gopath, _ := os.LookupEnv("GOPATH")
+			target = strings.Replace(target, gopath, "$GOPATH", 1)
+
+			// Print the symlink with its target
+			fmt.Println(prefix + node.Name() + " -> " + target)
+		} else {
+			fmt.Println(prefix + node.Name())
+		}
 	}
 
 	// If it's a directory and we haven't reached max depth, recurse further
@@ -55,16 +69,7 @@ func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int)
 			} else {
 				entryPrefix = prefix + prefix
 			}
-
-			// Use os.Stat to get information about the entry (os.Stat follows symlinks)
-			info, err := os.Stat(filepath.Join(newPath, entry.Name()))
-			if err != nil {
-				return err
-			}
-
-			// Create a fs.DirEntry from the FileInfo obtained from os.Stat
-			entry = fs.FileInfoToDirEntry(info)
-			err = printDir(newPath, entry, entryPrefix, depth+1, maxDepth)
+			err := printDir(newPath, entry, entryPrefix, depth+1, maxDepth)
 			if err != nil {
 				return err
 			}
