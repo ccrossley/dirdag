@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,65 +16,46 @@ var (
 	defaultDepth = 3
 )
 
-func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int) error {
-	// Skip hidden files or directories
-	if strings.HasPrefix(node.Name(), ".") {
+func printDir(root string, maxDepth int) error {
+	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		// Ignore the root directory
+		if path == root {
+			return nil
+		}
+		// Get the relative path
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		// Skip hidden files and directories
+		parts := strings.Split(rel, string(filepath.Separator))
+		for _, part := range parts {
+			if strings.HasPrefix(part, ".") {
+				return filepath.SkipDir
+			}
+		}
+		// Check the depth
+		depth := len(parts)
+		if depth > maxDepth {
+			return filepath.SkipDir
+		}
+		// Check the file type
+		if info.IsDir() || filepath.Ext(info.Name()) == ".fish" {
+			// Create the prefix
+			prefix := strings.Repeat(indent, depth-1)
+			if depth > 1 {
+				prefix += prefix
+			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				prefix += "(symlink) "
+			}
+			fmt.Println(prefix + info.Name())
+		}
 		return nil
-	}
-
-	// Check if entry is a symlink
-	symlink := ""
-	isSymlink := node.Type()&fs.ModeSymlink != 0
-	var resolvedPath string
-	if isSymlink {
-		symlink = " (symlink)"
-		var err error
-		resolvedPath, err = os.Readlink(filepath.Join(path, node.Name()))
-		if err != nil {
-			return err
-		}
-		// Trim the trailing slash if it exists
-		resolvedPath = strings.TrimSuffix(resolvedPath, "/")
-		// Convert resolved path to absolute path
-		if !filepath.IsAbs(resolvedPath) {
-			resolvedPath = filepath.Join(path, resolvedPath)
-		}
-	}
-
-	// Print only directories and .fish files
-	if node.IsDir() || filepath.Ext(node.Name()) == ".fish" {
-		fmt.Println(prefix + node.Name() + symlink)
-	}
-
-	// If it's a directory and we haven't reached max depth, recurse further
-	if node.IsDir() && depth < maxDepth {
-		newPath := filepath.Join(path, node.Name())
-		dirEntries, err := os.ReadDir(newPath)
-		if err != nil {
-			return err
-		}
-
-		for i, entry := range dirEntries {
-			isLast := i == len(dirEntries)-1
-
-			newPrefix := indent
-			if isLast {
-				newPrefix = lastIndent
-			}
-
-			entryPrefix := prefix + newPrefix
-			if isLast {
-				entryPrefix = prefix + lastPrefix
-			}
-
-			newDepth := depth + 1
-			err = printDir(newPath, entry, entryPrefix, newDepth, maxDepth)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	})
 }
 
 func main() {
@@ -94,23 +74,11 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	dirEntries, err := os.ReadDir(root)
-	if err != nil {
-		fmt.Println("Error reading directory:", err)
-		os.Exit(1)
-	}
 	fmt.Println(root)
-	for i, entry := range dirEntries {
-		isLast := i == len(dirEntries)-1
-		prefix := prefix
-		if isLast {
-			prefix = lastPrefix
-		}
-		err = printDir(root, entry, prefix, 1, maxDepth)
-		if err != nil {
-			fmt.Println("Error printing directory:", err)
-			os.Exit(1)
-		}
+	err := printDir(root, maxDepth)
+	if err != nil {
+		fmt.Println("Error printing directory:", err)
+		os.Exit(1)
 	}
 	fmt.Println("Diagram generation completed.")
 }
