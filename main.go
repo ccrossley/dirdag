@@ -45,6 +45,8 @@ func buildTree(root string, maxDepth int) (*Node, error) {
 
 		// Check the depth
 		depth := len(parts)
+		// We don't want to add new directories or files to the tree beyond the maxDepth
+		// But we should still continue the Walk to look at their siblings
 		if depth > maxDepth {
 			return nil
 		}
@@ -62,8 +64,7 @@ func buildTree(root string, maxDepth int) (*Node, error) {
 						break
 					}
 				}
-				// Add a new node only if depth is within the limit
-				if !found && depth <= maxDepth {
+				if !found {
 					newNode := &Node{Name: part}
 					current.Children = append(current.Children, newNode)
 					current = newNode
