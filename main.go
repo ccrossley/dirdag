@@ -12,6 +12,7 @@ type Node struct {
 	Name     string
 	Children []*Node
 	IsLink   bool
+	AtDepth  int
 }
 
 var (
@@ -23,7 +24,7 @@ var (
 )
 
 func buildTree(root string, maxDepth int) (*Node, error) {
-	rootNode := &Node{Name: root}
+	rootNode := &Node{Name: root, AtDepth: 0}
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -65,7 +66,7 @@ func buildTree(root string, maxDepth int) (*Node, error) {
 					}
 				}
 				if !found {
-					newNode := &Node{Name: part}
+					newNode := &Node{Name: part, AtDepth: depth}
 					current.Children = append(current.Children, newNode)
 					current = newNode
 				}
@@ -80,7 +81,7 @@ func buildTree(root string, maxDepth int) (*Node, error) {
 }
 
 func printTree(node *Node, prefix string) {
-	fmt.Println(prefix + node.Name)
+	fmt.Println(prefix+node.Name, node.AtDepth)
 	newPrefix := prefix + indent
 	if node.IsLink {
 		newPrefix += "(symlink) "
