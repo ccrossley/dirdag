@@ -2,18 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 )
-
-type Node struct {
-	Name     string
-	Children []*Node
-	IsLink   bool
-	AtDepth  int
-}
 
 var (
 	prefix       = "├── "
@@ -23,76 +17,60 @@ var (
 	defaultDepth = 3
 )
 
-func buildTree(root string, maxDepth int) (*Node, error) {
-	rootNode := &Node{Name: root, AtDepth: 0}
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Get the relative path
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-
-		// Skip hidden files or directories
-		parts := strings.Split(rel, string(filepath.Separator))
-		for _, part := range parts {
-			if strings.HasPrefix(part, ".") {
-				return nil
-			}
-		}
-
-		// Check the depth
-		depth := len(parts)
-		// We don't want to add new directories or files to the tree beyond the maxDepth
-		// But we should still continue the Walk to look at their siblings
-		if depth > maxDepth {
-			return nil
-		}
-
-		// Check the file type
-		if info.IsDir() || filepath.Ext(info.Name()) == ".fish" {
-			// Traverse the tree to the correct location
-			current := rootNode
-			for _, part := range parts {
-				found := false
-				for _, child := range current.Children {
-					if child.Name == part {
-						current = child
-						found = true
-						break
-					}
-				}
-				if !found {
-					newNode := &Node{Name: part, AtDepth: depth}
-					current.Children = append(current.Children, newNode)
-					current = newNode
-				}
-			}
-			current.IsLink = info.Mode()&os.ModeSymlink != 0
-		}
-
+func printDir(path string, node fs.DirEntry, prefix string, depth, maxDepth int) error {
+	// Skip hidden files or directories
+	if strings.HasPrefix(node.Name(), ".") {
 		return nil
-	})
-
-	return rootNode, err
-}
-
-func printTree(node *Node, prefix string) {
-	fmt.Println(prefix+node.Name, node.AtDepth)
-	newPrefix := prefix + indent
-	if node.IsLink {
-		newPrefix += "(symlink) "
 	}
-	for i, child := range node.Children {
-		if i == len(node.Children)-1 {
-			printTree(child, newPrefix+lastPrefix)
-		} else {
-			printTree(child, newPrefix+prefix)
+
+	// Check if entry is a symlink
+	symlink := ""
+	if node.Type()&fs.ModeSymlink != 0 {
+		symlink = " (symlink)"
+	}
+
+	// Print only directories and .fish files
+	if node.IsDir() || filepath.Ext(node.Name()) == ".fish" {
+		fmt.Println(prefix + node.Name() + symlink)
+	}
+
+	// If it's a directory and we haven't reached max depth, recurse further
+	if node.IsDir() && depth < maxDepth {
+		newPath := filepath.Join(path, node.Name())
+		dirEntries, err := os.ReadDir(newPath)
+		if err != nil {
+			return err
+		}
+
+		for i, entry := range dirEntries {
+			isLast := i == len(dirEntries)-1
+			newPrefix := indent
+			if isLast {
+				newPrefix = lastIndent
+			}
+			entryPrefix := prefix + newPrefix
+			newPrefix = prefix + newPrefix
+			if isLast {
+				entryPrefix = prefix + lastPrefix
+			} else {
+				entryPrefix = prefix + prefix
+			}
+
+			// Use os.Stat to get information about the entry (os.Stat follows symlinks)
+			info, err := os.Stat(filepath.Join(newPath, entry.Name()))
+			if err != nil {
+				return err
+			}
+
+			// Create a fs.DirEntry from the FileInfo obtained from os.Stat
+			entry = fs.FileInfoToDirEntry(info)
+			err = printDir(newPath, entry, entryPrefix, depth+1, maxDepth)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func main() {
@@ -111,13 +89,33 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
-	rootNode, err := buildTree(root, maxDepth)
+	dirEntries, err := os.ReadDir(root)
 	if err != nil {
-		fmt.Println("Error building directory tree:", err)
+		fmt.Println("Error reading directory:", err)
 		os.Exit(1)
 	}
+	fmt.Println(root)
+	for i, entry := range dirEntries {
+		isLast := i == len(dirEntries)-1
+		prefix := prefix
+		if isLast {
+			prefix = lastPrefix
+		}
 
-	printTree(rootNode, "")
+		// Use os.Stat to get information about the entry (os.Stat follows symlinks)
+		info, err := os.Stat(filepath.Join(root, entry.Name()))
+		if err != nil {
+			fmt.Println("Error accessing entry:", err)
+			os.Exit(1)
+		}
+
+		// Create a fs.DirEntry from the FileInfo obtained from os.Stat
+		entry = fs.FileInfoToDirEntry(info)
+		err = printDir(root, entry, prefix, 1, maxDepth)
+		if err != nil {
+			fmt.Println("Error printing directory:", err)
+			os.Exit(1)
+		}
+	}
 	fmt.Println("Diagram generation completed.")
 }
